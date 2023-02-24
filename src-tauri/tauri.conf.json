@@ -2,7 +2,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
+    "devPath": "http://localhost:21420",
     "distDir": "../dist",
     "withGlobalTauri": false
   },
@@ -120,8 +120,14 @@
         "description": "Serial port to use",
         "takesValue": true,
         "multiple": false,
-        "required": true
-
+        "required": false
+      }, {
+        "name": "config",
+        "short": "c",
+        "description": "Config file to use",
+        "takesValue": true,
+        "multiple": false,
+        "required": false
       }]
     }
   }
