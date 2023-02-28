@@ -34,7 +34,7 @@
       getS8Value().then((value) => {
         s8Value = value;
       });
-    }, 10000);
+    }, 60000);
 
     return () => {
       clearInterval(interval);

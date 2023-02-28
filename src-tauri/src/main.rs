@@ -9,6 +9,9 @@ use tauri::{
     CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
 
+use std::os::windows::process::CommandExt;
+use std::process::Command;
+
 
 
 // TODO: add a port selector
@@ -41,6 +44,8 @@ fn exec_hooks(s8_value: u16) {
                 println!("Executing hook: {}", path.display());
                 let output = std::process::Command::new(path)
                     .arg(s8_value.to_string())
+                    // TODO: make it cross-platform
+                    .creation_flags(0x08000000)
                     .output()
                     .expect("Failed to execute hook");
                 println!("Hook output: {}", String::from_utf8_lossy(&output.stdout));
