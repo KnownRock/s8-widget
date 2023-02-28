@@ -25,14 +25,42 @@ fn get_ports() -> Vec<SerialPortInfo> {
     return serialport::available_ports().expect("No ports found!");
 }
 
+
+fn exec_hooks(s8_value: u16) {
+    println!("Executing hooks...");
+    println!("S8 value: {}", s8_value);
+    println!("Current directory: {}", std::env::current_dir().unwrap().display());
+
+    // traverse hooks folder and execute all files
+    let hooks_path = std::path::Path::new("hooks");
+    if hooks_path.exists() {
+        for entry in std::fs::read_dir(hooks_path).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() {
+                println!("Executing hook: {}", path.display());
+                let output = std::process::Command::new(path)
+                    .arg(s8_value.to_string())
+                    .output()
+                    .expect("Failed to execute hook");
+                println!("Hook output: {}", String::from_utf8_lossy(&output.stdout));
+            }
+        }
+    }
+
+
+}
+
+
 #[tauri::command]
 fn get_s8_value(state: State<'_, Config>) -> u16 {
-
     let config = state.0.lock().unwrap();
 
     let get_value_type = config.get("type").unwrap();
 
     dbg!(get_value_type);
+
+    
 
     if get_value_type == "serial" {
             
@@ -63,6 +91,8 @@ fn get_s8_value(state: State<'_, Config>) -> u16 {
         let low_byte = buf[4];
         // calculate the value
         let value = (high_byte as u16) * 256 + (low_byte as u16);
+        // call the hooks
+        exec_hooks(value);
         // return the value
         value
 
@@ -94,6 +124,8 @@ fn get_s8_value(state: State<'_, Config>) -> u16 {
         // TODO: add error handling and get value with key chain
         let value_text = res_json[key].as_str().unwrap();
         let value = value_text.parse::<u16>().unwrap();
+        // call the hooks
+        exec_hooks(value);
         value
 
     } else {
@@ -155,12 +187,10 @@ fn main() {
         .setup(|app| {
             match app.get_cli_matches() {
                 Ok(matches) => {
-
+                    let mut have_port_flag = false;
                     matches.args.get("port").map(|port| {
-                        
-
                         println!("Port: {}", &port.value);
-                        if &port.value == true {
+                        if &port.value != false {
                             let mut port_str = port.value.to_string();
 
                             // TODO: windows pars is wrapped in quotes, need to test on linux and mac
@@ -173,35 +203,40 @@ fn main() {
                             config.0.lock().unwrap().insert("port".to_string(), serde_json::Value::String(port_str));
                             config.0.lock().unwrap().insert("type".to_string(), serde_json::Value::String("serial".to_string()));
     
+                            println!("State managed");
                             app.manage(config);
                         }
 
-                      
+                        have_port_flag = true;
                     });
 
-                    matches.args.get("config").map(|config| {
-                        println!("Config: {}", &config.value);
+                    if !have_port_flag {
+                        matches.args.get("config").map(|config| {
+                            println!("Config: {}", &config.value);
 
-                        let config_file_path_raw = config.value.to_string();
+                            let config_file_path_raw = config.value.to_string();
 
-                        // dbg!(config_file_path.get(config_file_path.len() - 1..));
-                        let config_file_path = config_file_path_raw.replace("\"", "");
-                        
-                        println!("Config file path: {}", &config_file_path);
+                            // dbg!(config_file_path.get(config_file_path.len() - 1..));
+                            let config_file_path = config_file_path_raw.replace("\"", "");
+                            
+                            println!("Config file path: {}", &config_file_path);
 
-                        let config_state = Config(Mutex::new(HashMap::new()));
+                            let config_state = Config(Mutex::new(HashMap::new()));
 
-                        // read file
-                        let file = std::fs::read_to_string(config_file_path).expect("Unable to read file");
+                            // read file
+                            let file = std::fs::read_to_string(config_file_path).expect("Unable to read file");
 
-                        // parse file
-                        let config_map: HashMap<String, serde_json::Value > = serde_json::from_str(&file).expect("Unable to parse file");
+                            // parse file
+                            let config_map: HashMap<String, serde_json::Value > = serde_json::from_str(&file).expect("Unable to parse file");
 
-                        // add config to state
-                        config_state.0.lock().unwrap().extend(config_map);
+                            // add config to state
+                            config_state.0.lock().unwrap().extend(config_map);
 
-                        app.manage(config_state);
-                    });
+                            println!("State managed");
+                            app.manage(config_state);
+                        });
+                    }
+
                 }
                 Err(e) => {
                     println!("Error: {}", e);
